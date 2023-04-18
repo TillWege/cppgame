@@ -1,17 +1,32 @@
 /*******************************************************************************************
 *
-*   raylib [core] example - Keyboard input
+*   raylib [shaders] example - Texture Waves
 *
-*   Example originally created with raylib 1.0, last time updated with raylib 1.0
+*   NOTE: This example requires raylib OpenGL 3.3 or ES2 versions for shaders support,
+*         OpenGL 1.1 does not support shaders, recompile raylib to OpenGL 3.3 version.
+*
+*   NOTE: Shaders used in this example are #version 330 (OpenGL 3.3), to test this example
+*         on OpenGL ES 2.0 platforms (Android, Raspberry Pi, HTML5), use #version 100 shaders
+*         raylib comes with shaders ready for both versions, check raylib/shaders install folder
+*
+*   Example originally created with raylib 2.5, last time updated with raylib 3.7
+*
+*   Example contributed by Anata (@anatagawa) and reviewed by Ramon Santamaria (@raysan5)
 *
 *   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 *   BSD-like license that allows static linking with closed source software
 *
-*   Copyright (c) 2014-2023 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2019-2023 Anata (@anatagawa) and Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
 #include "raylib.h"
+
+#if defined(PLATFORM_DESKTOP)
+    #define GLSL_VERSION            330
+#else   // PLATFORM_RPI, PLATFORM_ANDROID, PLATFORM_WEB
+    #define GLSL_VERSION            100
+#endif
 
 //------------------------------------------------------------------------------------
 // Program main entry point
@@ -22,34 +37,68 @@ int main(void)
     //--------------------------------------------------------------------------------------
     const int screenWidth = 800;
     const int screenHeight = 450;
+    const char* asset_dir = ASSETS_PATH;
+     
+    InitWindow(screenWidth, screenHeight, "raylib [shaders] example - texture waves");
 
-    InitWindow(screenWidth, screenHeight, "raylib [core] example - keyboard input");
+    // Load texture texture to apply shaders
+    Texture2D texture = LoadTexture(asset_dir + "space.png");
 
-    Vector2 ballPosition = { (float)screenWidth / 2, (float)screenHeight / 2 };
+    // Load shader and setup location points and values
+    Shader shader = LoadShader(0, TextFormat(ASSETS_PATH"wave.fs", GLSL_VERSION));
 
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
-    //--------------------------------------------------------------------------------------
+    int secondsLoc = GetShaderLocation(shader, "secondes");
+    int freqXLoc = GetShaderLocation(shader, "freqX");
+    int freqYLoc = GetShaderLocation(shader, "freqY");
+    int ampXLoc = GetShaderLocation(shader, "ampX");
+    int ampYLoc = GetShaderLocation(shader, "ampY");
+    int speedXLoc = GetShaderLocation(shader, "speedX");
+    int speedYLoc = GetShaderLocation(shader, "speedY");
+
+    // Shader uniform values that can be updated at any time
+    float freqX = 25.0f;
+    float freqY = 25.0f;
+    float ampX = 5.0f;
+    float ampY = 5.0f;
+    float speedX = 8.0f;
+    float speedY = 8.0f;
+
+    float screenSize[2] = { (float)GetScreenWidth(), (float)GetScreenHeight() };
+    SetShaderValue(shader, GetShaderLocation(shader, "size"), &screenSize, SHADER_UNIFORM_VEC2);
+    SetShaderValue(shader, freqXLoc, &freqX, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, freqYLoc, &freqY, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, ampXLoc, &ampX, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, ampYLoc, &ampY, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, speedXLoc, &speedX, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, speedYLoc, &speedY, SHADER_UNIFORM_FLOAT);
+
+    float seconds = 0.0f;
+
+    SetTargetFPS(100);               // Set our game to run at 60 frames-per-second
+    // -------------------------------------------------------------------------------------------------------------
 
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
         // Update
         //----------------------------------------------------------------------------------
-        if (IsKeyDown(KEY_RIGHT)) ballPosition.x += 2.0f;
-        if (IsKeyDown(KEY_LEFT)) ballPosition.x -= 2.0f;
-        if (IsKeyDown(KEY_UP)) ballPosition.y -= 2.0f;
-        if (IsKeyDown(KEY_DOWN)) ballPosition.y += 2.0f;
+        seconds += GetFrameTime();
+
+        SetShaderValue(shader, secondsLoc, &seconds, SHADER_UNIFORM_FLOAT);
         //----------------------------------------------------------------------------------
 
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
 
-        ClearBackground(RAYWHITE);
+            ClearBackground(RAYWHITE);
 
-        DrawText("move the ball with arrow keys", 10, 10, 20, DARKGRAY);
+            BeginShaderMode(shader);
 
-        DrawCircleV(ballPosition, 50, MAROON);
+                DrawTexture(texture, 0, 0, WHITE);
+                DrawTexture(texture, texture.width, 0, WHITE);
+
+            EndShaderMode();
 
         EndDrawing();
         //----------------------------------------------------------------------------------
@@ -57,7 +106,10 @@ int main(void)
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
-    CloseWindow();        // Close window and OpenGL context
+    UnloadShader(shader);         // Unload shader
+    UnloadTexture(texture);       // Unload texture
+
+    CloseWindow();              // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
     return 0;
